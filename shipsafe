@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SHIPS_VERSION="0.2.0"
+
+resolve_script_dir() {
+    local source_path="${BASH_SOURCE[0]}"
+    while [[ -L "$source_path" ]]; do
+        local dir
+        dir="$(cd -P "$(dirname "$source_path")" && pwd)"
+        source_path="$(readlink "$source_path")"
+        [[ "$source_path" != /* ]] && source_path="$dir/$source_path"
+    done
+    cd -P "$(dirname "$source_path")" && pwd
+}
+
+SCRIPT_ROOT="$(resolve_script_dir)"
+export SCRIPT_ROOT
+
+# shellcheck source=scripts/validate.sh
+source "${SCRIPT_ROOT}/scripts/validate.sh"
+# shellcheck source=scripts/connect.sh
+source "${SCRIPT_ROOT}/scripts/connect.sh"
+# shellcheck source=scripts/transfer.sh
+source "${SCRIPT_ROOT}/scripts/transfer.sh"
+# shellcheck source=scripts/deploy.sh
+source "${SCRIPT_ROOT}/scripts/deploy.sh"
+
+usage() {
+    cat <<'EOF'
+Usage:
+  shipsafe deploy <project_dir> --host <host> --user <user> --key <key_path> [options]
+  shipsafe --help | --version
+
+Options:
+  --host <host>        Remote server IP address or hostname
+  --user <user>        SSH username on the remote server
+  --key <key_path>     Path to the SSH private key
+  --port <port>        SSH port (default: 22)
+  --timeout <seconds>  SSH connection timeout in seconds (default: 30)
+  --log-dir <dir>      Local directory for deployment logs (default: ~/.shipsafe/logs)
+  -h, --help           Show this help message
+  -v, --version        Show version
+EOF
+}
+
+main() {
+    if [[ $# -eq 0 ]]; then
+        usage >&2
+        return 2
+    fi
+
+    case "$1" in
+        -h|--help)
+            usage
+            return 0
+            ;;
+        -v|--version)
+            printf 'shipsafe %s\n' "$SHIPS_VERSION"
+            return 0
+            ;;
+        deploy)
+            shift
+            ;;
+        *)
+            printf '[shipsafe] Unknown command: %s\n' "$1" >&2
+            usage >&2
+            return 2
+            ;;
+    esac
+
+    if ! parse_deploy_args "$@"; then
+        return 2
+    fi
+
+    if ! validate_deployment_inputs; then
+        return 2
+    fi
+
+    run_deployment
+}
+
+main "$@"

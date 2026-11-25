@@ -1,0 +1,5 @@
+*.log
+.shipsafe/
+.DS_Store
+__pycache__/
+*.pyc
